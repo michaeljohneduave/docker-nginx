@@ -3,6 +3,7 @@ FROM alpine:3.5
 LABEL maintainer="NGINX Docker Maintainers <docker-maint@nginx.com>"
 
 ENV NGINX_VERSION 1.12.2
+ENV STICKY_VERSION 1.2.6
 
 RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& CONFIG="\
@@ -49,6 +50,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		--with-compat \
 		--with-file-aio \
 		--with-http_v2_module \
+                --add-module=/usr/src/nginx-sticky-module \
 	" \
 	&& addgroup -S nginx \
 	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
@@ -65,7 +67,9 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		libxslt-dev \
 		gd-dev \
 		geoip-dev \
-	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
+        unzip \
+	&& curl -sfSL https://bitbucket.org/nginx-goodies/nginx-sticky-module-ng/get/$STICKY_VERSION.zip -o sticky.zip \
+        && curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
 	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc \
 	&& export GNUPGHOME="$(mktemp -d)" \
 	&& found=''; \
@@ -82,7 +86,11 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	gpg --batch --verify nginx.tar.gz.asc nginx.tar.gz \
 	&& rm -r "$GNUPGHOME" nginx.tar.gz.asc \
 	&& mkdir -p /usr/src \
-	&& tar -zxC /usr/src -f nginx.tar.gz \
+	&& unzip -j sticky.zip -d /usr/src/nginx-sticky-module \
+	&& sed -i '/#include <ngx_sha1.h>/a#include <openssl/md5.h>' /usr/src/nginx-sticky-module/ngx_http_sticky_misc.c \
+	&& sed -i '/#include <ngx_sha1.h>/a#include <openssl/sha.h>' /usr/src/nginx-sticky-module/ngx_http_sticky_misc.c \
+	&& cat /usr/src/nginx-sticky-module/ngx_http_sticky_misc.c | head -n 15 \
+    && tar -zxC /usr/src -f nginx.tar.gz \
 	&& rm nginx.tar.gz \
 	&& cd /usr/src/nginx-$NGINX_VERSION \
 	&& ./configure $CONFIG --with-debug \
@@ -128,6 +136,13 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& apk del .gettext \
 	&& mv /tmp/envsubst /usr/local/bin/ \
 	\
+	# Clean caches and temp-files:
+	&& rm -rf /var/cache/apk 2> /dev/null || echo "OK" \
+	&& rm -rf /tmp/* 2> /dev/null || echo "OK" \
+	&& rm -rf /tmp/.* 2> /dev/null || echo "OK" \
+	&& rm -rf /root/* 2> /dev/null || echo "OK" \
+	&& rm -rf /root/.* 2> /dev/null || echo "OK" \
+        \
 	# forward request and error logs to docker log collector
 	&& ln -sf /dev/stdout /var/log/nginx/access.log \
 	&& ln -sf /dev/stderr /var/log/nginx/error.log
