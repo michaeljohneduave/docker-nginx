@@ -1,0 +1,26 @@
+## Install certbot
+sudo add-apt-repository ppa:certbot/certbot -y && \
+sudo apt-get update && \
+sudo apt-get install certbot -y
+
+
+## Generate dhparam
+openssl dhparam -dsaparam -out dhparam.pem 2048
+
+## Login to micab dockyard and run
+docker run -d \
+-p 80:80 \
+-p 443:443 \
+-v $(pwd)/conf.d:/etc/nginx/conf.d \
+-v $(pwd)/nginx.conf:/etc/nginx/nginx.conf \
+-v /etc/letsencrypt:/etc/letsencrypt \
+-v $(pwd)/letsencrypt-webroot:/var/www/letsencrypt \
+-v $(pwd)/dhparam.pem:/etc/ssl/certs/dhparam.pem \
+--restart unless-stopped \
+--log-opt max-size=10m \
+--net=host \
+--name micab-nginx-sticky \
+your.private.repo/nginx-sticky
+
+## Obtain ssl cert
+sudo certbot certonly --standalone --preferred-challenges http -d example.com
