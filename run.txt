@@ -5,7 +5,7 @@ sudo apt-get install certbot -y
 
 
 ## Generate dhparam
-openssl dhparam -dsaparam -out dhparam.pem 2048
+openssl dhparam -out dhparam.pem 4096
 
 ## Login to micab dockyard and run
 docker run -d \
@@ -23,4 +23,4 @@ docker run -d \
 your.private.repo/nginx-sticky
 
 ## Obtain ssl cert
-sudo certbot certonly --standalone --preferred-challenges http -d example.com
+certbot certonly -a webroot --webroot-path=$(pwd)/letsencrypt-webroot -d example.net
